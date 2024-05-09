@@ -3,7 +3,7 @@ var user = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-	if (request.action == "ADD_TASK") {
+	if (request.action == "AUTHORIZE") {
 		getToken().then(userData => {
 			user = userData
 			sendResponse({ success: true, result: userData });
@@ -12,12 +12,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 		});
 		return true;
 	}
+	else if (request.action == "ADD_TASK") {
+
+	}
 })
 
-
-function getSessionStorage() {
-	return window.sessionStorage.getItem('oidc.user:https://id.eastsoft.pl/:app_rcp');
-}
 function getToken() {
 	return new Promise((resolve, reject) => {
 		chrome.tabs.query({ active: false, url: 'https://rcp.eastsoft.pl/' }, function (tabs) {
@@ -37,4 +36,7 @@ function getToken() {
 			});
 		})
 	});
+}
+function getSessionStorage() {
+	return window.sessionStorage.getItem('oidc.user:https://id.eastsoft.pl/:app_rcp');
 }
