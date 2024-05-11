@@ -1,18 +1,25 @@
 const buttonAuthorize = document.querySelector("#btn-authorize");
 const buttonAddTask = document.querySelector("#btn-add-task");
 const userNameLabel = document.getElementById('UserName');
+const errorDiv = document.getElementById('errors');
+const errorLabel = document.getElementById('error-value');
+
 
 buttonAuthorize.addEventListener("click", async () => {
 	try {
+		errorDiv.style.display = 'none';
 		const currentWindow = await chrome.windows.getCurrent();
 		const activeTabs = await chrome.tabs.query({ active: true, windowId: currentWindow.id });
 
 		function sendPromise(tab) {
 			return new Promise((resolve, reject) => {
 				chrome.runtime.sendMessage({ action: "AUTHORIZE" }, response => {
-					debugger
-					if (response && response.success)
+					if (response == undefined)
+						reject('Response undefined.');
+
+					if (response && response.success) {
 						resolve(response.result);
+					}
 					else
 						reject(response.result);
 				});
@@ -20,26 +27,32 @@ buttonAuthorize.addEventListener("click", async () => {
 		}
 
 		const userData = await Promise.all(activeTabs.map(tab => sendPromise(tab)));
-		userNameLabel.innerHTML = userData.visibleName;
-		console.log(userData);
+		if (userData.length > 0)
+			userNameLabel.innerHTML = userData[0].profile.username;
 	} catch (error) {
-		console.log("Error: ", error);
+		errorDiv.style.display = 'block';
+		errorLabel.textContent = error;
 	}
 });
 
 
 buttonAddTask.addEventListener("click", async () => {
 	try {
+		errorDiv.style.display = 'none';
 		const currentWindow = await chrome.windows.getCurrent();
 		const activeTabs = await chrome.tabs.query({ active: true, windowId: currentWindow.id });
 
 		function sendPromise(tab) {
 			return new Promise((resolve, reject) => {
 				chrome.runtime.sendMessage({ action: "ADD_TASK" }, response => {
+					if (response == undefined)
+						reject('Response undefined.');
+
 					if (response && response.success)
 						resolve(response.result);
-					else
+					else {
 						reject(response.result);
+					}
 				});
 			});
 		}
@@ -47,6 +60,7 @@ buttonAddTask.addEventListener("click", async () => {
 		const responseData = await Promise.all(activeTabs.map(tab => sendPromise(tab)));
 
 	} catch (error) {
-		console.log("Error: ", error);
+		errorDiv.style.display = 'block';
+		errorLabel.textContent = error;
 	}
 })
