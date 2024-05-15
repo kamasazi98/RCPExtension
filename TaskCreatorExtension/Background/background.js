@@ -5,6 +5,9 @@ import * as ExternalSystemRequester from './Requesters/ExternalSystemRequester.j
 import * as CompanyRequester from './Requesters/CompanyRequester.js';
 import * as TaskRequester from './Requesters/TaskRequester.js';
 
+
+
+
 var user = null;
 var categories = null;
 var projects = null;
@@ -14,7 +17,7 @@ var task = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-	if (request.action == "AUTHORIZE") {
+	if (request.action == `${LISTENER_AUTHORIZE}`) {
 		getToken().then(userData => {
 			user = userData
 			sendResponse({ success: true, result: userData });
@@ -22,7 +25,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 			sendResponse({ success: false, result: error });
 		});
 	}
-	else if (request.action == "ADD_TASK") {
+	else if (request.action == `${LISTENER_ADD_TASK}`) {
 		acquireData().then(() => {
 			return retrieveTask()
 		}).then(() => {
@@ -36,7 +39,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 function getToken() {
 	return new Promise((resolve, reject) => {
-		chrome.tabs.query({ active: false, url: 'https://rcp.eastsoft.pl/' }, function (tabs) {
+		chrome.tabs.query({ active: false, url: `${RCP_URL}` }, function (tabs) {
 			if (tabs.length <= 0)
 				throw new Error('RCP main site not found');
 			var pageId = tabs[0].id;
@@ -57,7 +60,7 @@ function getToken() {
 	});
 }
 function getSessionStorage() {
-	return window.sessionStorage.getItem('oidc.user:https://id.eastsoft.pl/:app_rcp');
+	return window.sessionStorage.getItem(`${RCP_USER_ID_KEY}`);
 }
 
 
@@ -84,6 +87,30 @@ async function retrieveTask() {
 		await acquireTaskTab((error, activeTab) => {
 			if (error)
 				throw error;
+
+			var resultOfScripting = await chrome.scripting.executeScript({
+				target: { tabId: activeTab[0].id },
+				func: searchDivByClass,
+				args: [`${TASK_SELECTOR_DIV_CONTAINER}`]
+			});
+
+			if (result == undefined)
+				throw new Error('Could not find container with task.');
+
+			const domParser = new DOMParser();
+			const doc = domParser.parseFromString(resultOfScripting, 'text/html');
+			const taskIdLabel = doc.querySelector(`${TASK_SELECTOR_TASK_IDENTIFIER}`);
+			const taskNameLabel = doc.querySelector(`${TASK_SELECTOR_TASK_NAME}`);
+			const taskProjectLabel = doc.querySelector(`${TASK_SELECTOR_TASK_PROJECT}`);
+			const taskExternalSystemLabel = EXTERNAL_SYSTEMS_NONE;
+
+			if (activeTab[0].url.includes(EXTERNAL_SYSTEMS_SYMFONIA))
+				taskExternalSystemLabel = EXTERNAL_SYSTEMS_SYMFONIA;
+			else if (activeTab[0].url.includes(EXTERNAL_SYSTEMS_EASTSOFT))
+				taskExternalSystemLabel = EXTERNAL_SYSTEMS_EASTSOFT;
+			else if (activeTab[0].url.includes(EXTERNAL_SYSTEMS_JIRA))
+				taskExternalSystemLabel = EXTERNAL_SYSTEMS_JIRA;
+
 		})
 	}
 	catch (error) {
@@ -96,11 +123,15 @@ async function acquireTaskTab(callback) {
 		if (!activeTab)
 			callback(new Error('Active tab not found'), null);
 
-		if (activeTab.url.includes('https://tfs.eastsoft.pl'))
+		if (activeTab.url.includes(`${TFS_URL_EASTSOFT}`))
 			callback(null, activeTab);
-		else if (activeTab.url.includes('https://dev.azure.com/symfoniapl/'))
+		else if (activeTab.url.includes(`${TFS_URL_SYMFONIA}`))
 			callback(null, activeTab);
 		else
 			callback(Error('Invalid active tab. Active tab is not a eastsoft tfs or symfonia.'), null);
 	});
+}
+async function searchDivByClass(className) {
+	const div = document.querySelector(`.${className}`);
+	return div ? div.outerHTML : null;
 }
